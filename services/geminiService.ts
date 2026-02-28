@@ -1,10 +1,21 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Contact } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const MODEL_NAME = 'gemini-2.0-flash';
 
-const MODEL_NAME = 'gemini-3-flash-preview';
+// Lazy init: avoid crashing app on load when API key is missing or invalid
+let _ai: GoogleGenAI | null = null;
+function getAI(): GoogleGenAI | null {
+  if (_ai) return _ai;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY || '';
+  if (!apiKey) return null;
+  try {
+    _ai = new GoogleGenAI({ apiKey });
+    return _ai;
+  } catch {
+    return null;
+  }
+}
 
 export const generateIceBreakers = async (contact: Contact): Promise<string[]> => {
   const customAttributes = contact.attributes.map(a => `${a.label}: ${a.value}`).join(', ');
@@ -18,6 +29,9 @@ export const generateIceBreakers = async (contact: Contact): Promise<string[]> =
     - Role: ${contact.title} at ${contact.company}
     - Personal Details: ${customAttributes}
   `;
+
+  const ai = getAI();
+  if (!ai) return ["How have you been?", "Working on anything exciting?", "Long time no see!"];
 
   try {
     const response = await ai.models.generateContent({
@@ -64,6 +78,9 @@ export const generateDiscussionTopics = async (contact: Contact, socialUpdate?: 
     Return JSON with 'topics' as an array of 3 to 5 strings. Each string should be a concise bullet point.
   `;
 
+  const ai = getAI();
+  if (!ai) return ["Follow up on previous projects", "Ask about recent work updates", "General catch up on personal interests"];
+
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
@@ -96,6 +113,9 @@ export const generateDraftEmail = async (contact: Contact, intent: string): Prom
     Return JSON with 'subject' and 'body'.
   `;
 
+  const ai = getAI();
+  if (!ai) return { subject: "Hello", body: "Hi, just reaching out." };
+
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
@@ -127,6 +147,9 @@ export const summarizeMeeting = async (notes: string, contactName: string): Prom
     Summarize these meeting notes with ${contactName}: "${notes}"
     Return JSON with 'summary' (array) and 'suggestedDateOffsetDays' (number).
   `;
+
+  const ai = getAI();
+  if (!ai) return { summary: ["Could not summarize."], suggestedDateOffsetDays: 30 };
 
   try {
     const response = await ai.models.generateContent({
@@ -172,6 +195,9 @@ export const getContactUpdate = async (contact: Contact): Promise<{ summary: str
   SUGGESTIONS: [${responseAddon} If HAS_UPDATE is NO, leave this empty.]
   
   Be very strict. If you cannot find a specific post or change from the last week, set HAS_UPDATE to NO.`;
+
+  const ai = getAI();
+  if (!ai) return { hasUpdate: false, summary: "No updates found.", suggestions: [], sources: [] };
 
   try {
     const response = await ai.models.generateContent({
